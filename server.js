@@ -13,7 +13,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ["http://localhost:3000", "https://vidarbhabioenergysolutions.com/"], // update this for frontend deployment
+  origin: [ "https://vidarbhabioenergysolutions.com/"], // update this for frontend deployment
   credentials: true,
 }));
 app.use(bodyParser.json());
