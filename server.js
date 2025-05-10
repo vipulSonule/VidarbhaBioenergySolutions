@@ -13,7 +13,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: [ "https://vidarbhabioenergysolutions.com"], // update this for frontend deployment
+  origin: [
+    "http://localhost:3000",
+    "https://lustrous-begonia-a4f1a8.netlify.app"
+  ],
   credentials: true,
 }));
 app.use(bodyParser.json());
