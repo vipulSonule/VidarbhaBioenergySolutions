@@ -12,13 +12,14 @@ const Inquiry = require("./models/Inquiry");
 const app = express();
 
 // Middleware
+const cors = require("cors");
+
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://lustrous-begonia-a4f1a8.netlify.app"
-  ],
-  credentials: true,
+  origin: ["https://vidarbhabioenergysolutions.com", "http://localhost:3000"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
 }));
+
 app.use(bodyParser.json());
 
 // MongoDB Connection
