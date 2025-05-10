@@ -12,13 +12,16 @@ const Inquiry = require("./models/Inquiry");
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "https://vidarbhabioenergysolutions.com/"], // update this for frontend deployment
+  credentials: true,
+}));
 app.use(bodyParser.json());
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/contactDB";
-mongoose
-  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+
+mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
@@ -59,14 +62,10 @@ app.post("/api/admin-login", async (req, res) => {
 
   try {
     const admin = await Admin.findOne({ username });
-    if (!admin) {
-      return res.status(401).json({ message: "Invalid credentials. User not found." });
-    }
+    if (!admin) return res.status(401).json({ message: "Invalid credentials. User not found." });
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials. Password mismatch." });
-    }
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials. Password mismatch." });
 
     const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
     res.json({ token });
@@ -141,8 +140,13 @@ app.get("/api/inquiries", verifyToken, async (req, res) => {
   }
 });
 
+// Health Check Route
+app.get("/", (req, res) => {
+  res.send({ status: "API is live 🚀" });
+});
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
