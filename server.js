@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors"); // ✅ Only declared once
+const cors = require("cors");
 const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -11,18 +11,32 @@ const Inquiry = require("./models/Inquiry");
 
 const app = express();
 
-// Middleware
+// CORS Configuration
+const allowedOrigins = [
+  "https://vidarbhabioenergysolutions.com",
+  "http://localhost:3000"
+];
+
 app.use(cors({
-  origin: ["https://vidarbhabioenergysolutions.com", "http://localhost:3000"],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true
+  credentials: true,
 }));
 
+// Handle preflight OPTIONS requests
+app.options("*", cors());
+
+// Body Parser
 app.use(bodyParser.json());
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/contactDB";
-
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => {
