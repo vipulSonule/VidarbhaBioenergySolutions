@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
+const cors = require("cors"); // ✅ Only declared once
 const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -12,8 +12,6 @@ const Inquiry = require("./models/Inquiry");
 const app = express();
 
 // Middleware
-const cors = require("cors");
-
 app.use(cors({
   origin: ["https://vidarbhabioenergysolutions.com", "http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
