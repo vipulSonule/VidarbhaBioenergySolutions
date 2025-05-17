@@ -2,40 +2,56 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const mongoSanitize = require("express-mongo-sanitize");
 
 const Admin = require("./models/Admin");
 const Inquiry = require("./models/Inquiry");
 
 const app = express();
 
-// CORS Configuration
+// Middleware
+app.use(express.json());
+app.use(helmet());
+
+// Sanitize req.body, req.params, req.query
+app.use((req, res, next) => {
+  if (req.body) req.body = mongoSanitize.sanitize(req.body);
+  if (req.params) req.params = mongoSanitize.sanitize(req.params);
+  if (req.query) {
+    Object.keys(req.query).forEach(key => {
+      req.query[key] = mongoSanitize.sanitize(req.query[key]);
+    });
+  }
+  next();
+});
+
+// CORS config
 const allowedOrigins = [
   "https://vidarbhabioenergysolutions.com",
   "http://localhost:3000"
 ];
-
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
 }));
 
-// Handle preflight OPTIONS requests
-app.options("*", cors());
+// Rate limiter for login route
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: "Too many login attempts. Try again later.",
+});
+app.use("/api/admin-login", loginLimiter);
 
-// Body Parser
-app.use(bodyParser.json());
-
-// MongoDB Connection
+// Connect to MongoDB
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/contactDB";
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
@@ -44,38 +60,34 @@ mongoose.connect(MONGO_URI)
     process.exit(1);
   });
 
-// Contact Schema & Model
+// Contact Schema & Model (for /api/contact route)
 const contactSchema = new mongoose.Schema({
-  name: String,
-  email: String,
-  contactNo: String,
-  company: String,
-  message: String,
-});
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  contactNo: { type: String, required: true },
+  company: { type: String },
+  message: { type: String, required: true },
+}, { timestamps: true });
 const Contact = mongoose.model("Contact", contactSchema);
 
-// JWT Middleware
+// JWT verification middleware
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "Access denied. Token required." });
-  }
+  if (!token) return res.status(401).json({ message: "Access denied. Token required." });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.admin = decoded;
     next();
   } catch {
-    return res.status(403).json({ message: "Invalid token. Access forbidden." });
+    res.status(403).json({ message: "Invalid token. Access forbidden." });
   }
 };
 
-// Admin Login
+// Admin login route
 app.post("/api/admin-login", async (req, res) => {
   const { username, password } = req.body;
-
   try {
     const admin = await Admin.findOne({ username });
     if (!admin) return res.status(401).json({ message: "Invalid credentials. User not found." });
@@ -91,16 +103,21 @@ app.post("/api/admin-login", async (req, res) => {
   }
 });
 
-// Contact Form Submission
+// Contact form submission route
 app.post("/api/contact", async (req, res) => {
   const { name, email, contactNo, company, message } = req.body;
-
-  if (!name || !email || !contactNo || !message) {
-    return res.status(400).json({ message: "All fields are required." });
+  if (!name?.trim() || !email?.trim() || !contactNo?.trim() || !message?.trim()) {
+    return res.status(400).json({ message: "Name, email, contactNo, and message are required." });
   }
 
   try {
-    const newContact = new Contact({ name, email, contactNo, company, message });
+    const newContact = new Contact({
+      name: name.trim(),
+      email: email.trim(),
+      contactNo: contactNo.trim(),
+      company: company?.trim() || "",
+      message: message.trim(),
+    });
     await newContact.save();
     res.status(201).json({ message: "Message received successfully!" });
   } catch (error) {
@@ -109,10 +126,9 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-// Inquiry Form Submission
+// Inquiry form submission route
 app.post("/api/inquiry", async (req, res) => {
   const { name, mobile, email, company, capacity, message } = req.body;
-
   if (!name?.trim() || !mobile?.trim() || !email?.trim() || !message?.trim()) {
     return res.status(400).json({ message: "Name, mobile, email, and message are required." });
   }
@@ -134,7 +150,7 @@ app.post("/api/inquiry", async (req, res) => {
   }
 });
 
-// Get Contacts (Protected)
+// Get all contacts (protected route)
 app.get("/api/contacts", verifyToken, async (req, res) => {
   try {
     const contacts = await Contact.find();
@@ -145,7 +161,7 @@ app.get("/api/contacts", verifyToken, async (req, res) => {
   }
 });
 
-// Get Inquiries (Protected)
+// Get all inquiries (protected route)
 app.get("/api/inquiries", verifyToken, async (req, res) => {
   try {
     const inquiries = await Inquiry.find();
@@ -156,12 +172,12 @@ app.get("/api/inquiries", verifyToken, async (req, res) => {
   }
 });
 
-// Health Check Route
+// Health check route
 app.get("/", (req, res) => {
   res.send({ status: "API is live 🚀" });
 });
 
-// Start Server
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
